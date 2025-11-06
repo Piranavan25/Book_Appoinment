@@ -8,6 +8,8 @@ from .models import Booking, Center, Service
 from .serializers import BookingSerializer
 from .utils import get_possible_slots, suggest_alternative_dates
 from django.utils import timezone
+from rest_framework.generics import ListAPIView
+from .serializers import CenterSerializer, ServiceSerializer
 
 class AvailabilityView(APIView):
     def get(self, request, center_id, date, service_id):
@@ -50,3 +52,11 @@ class BookingView(APIView):
             )
             return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class CenterListView(ListAPIView):
+    queryset = Center.objects.all()
+    serializer_class = CenterSerializer
+
+class ServiceListView(ListAPIView):
+    queryset = Service.objects.all()
+    serializer_class = ServiceSerializer

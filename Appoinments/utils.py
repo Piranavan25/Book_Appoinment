@@ -90,56 +90,81 @@ def get_free_intervals(center, date, duration_minutes):
     return free_intervals
 
 def get_possible_slots(center, date, duration_minutes):
-    """Generate intelligent time slots based on service duration"""
+    """Generate slots with dynamic intervals based on service type"""
     gaps = get_free_intervals(center, date, duration_minutes)
     slots = []
     
-    # Define slot patterns based on service duration
-    if duration_minutes >= 240:  # 4+ hours - major services
-        interval_minutes = 240  # 4 hours between slots
-        round_to = 60  # Round to nearest hour
-    elif duration_minutes >= 60:  # 1-3 hours - standard services
-        interval_minutes = 60  # 1 hour between slots
-        round_to = 60  # Round to nearest hour
-    elif duration_minutes >= 30:  # 30-59 minutes - medium services
-        interval_minutes = 60  # 1 hour between slots
-        round_to = 60  # Round to nearest hour
-    else:  # Under 30 minutes - quick services
-        interval_minutes = 30  # 30 minutes between slots
-        round_to = 30  # Round to nearest 30 minutes
+    # Calculate optimal interval considering buffer and efficiency
+    interval_minutes = max(duration_minutes, calculate_optimal_interval(duration_minutes))
+    
+    # Determine rounding based on service duration
+    if duration_minutes >= 60:
+        round_to = 60
+    elif duration_minutes >= 30:
+        round_to = 30
+    else:
+        round_to = 15
     
     for gap_start, gap_max_start in gaps:
         current_start = gap_start
         
-        # Round to appropriate time boundary
-        if round_to == 60:  # Round to hour
-            if current_start.minute != 0:
-                current_start = current_start.replace(minute=0, second=0, microsecond=0)
-                current_start += timedelta(hours=1)
-        elif round_to == 30:  # Round to 30 minutes
-            minutes = current_start.minute
-            if minutes < 30:
-                current_start = current_start.replace(minute=0, second=0, microsecond=0)
-            else:
-                current_start = current_start.replace(minute=30, second=0, microsecond=0)
+        # Round start time
+        current_start = round_time(current_start, round_to)
         
-        # Generate slots
         while current_start <= gap_max_start:
             end_time = current_start + timedelta(minutes=duration_minutes)
             
-            if end_time.time() <= time(18, 0):  # Within work hours
-                remaining_after = (timezone.datetime.combine(date, time(18, 0)) - end_time).total_seconds() / 60
-                
+            if end_time.time() <= time(18, 0):
                 slots.append({
                     'start_time': current_start.time(),
                     'end_time': end_time.time(),
-                    'gap_remaining_after': remaining_after
+                    'gap_remaining_after': (timezone.datetime.combine(date, time(18, 0)) - end_time).total_seconds() / 60
                 })
             
             current_start += timedelta(minutes=interval_minutes)
     
     slots.sort(key=lambda x: x['start_time'])
     return slots[:20]
+
+def calculate_optimal_interval(duration_minutes):
+    """Calculate optimal slot interval based on service duration"""
+    if duration_minutes >= 240:
+        return 240  # Major services - half day apart
+    elif duration_minutes >= 120:
+        return 120  # Lengthy services - 2 hours apart
+    elif duration_minutes >= 60:
+        return 60   # Standard services - hourly
+    elif duration_minutes >= 30:
+        return 45   # Quick services - 45 min intervals
+    else:
+        return 30   # Express services - 30 min intervals
+
+def round_time(dt, round_to):
+    """Round datetime to nearest interval"""
+    minutes = dt.minute
+    if round_to == 60:
+        if minutes >= 30:
+            return dt.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        else:
+            return dt.replace(minute=0, second=0, microsecond=0)
+    elif round_to == 30:
+        if minutes < 15:
+            return dt.replace(minute=0, second=0, microsecond=0)
+        elif minutes < 45:
+            return dt.replace(minute=30, second=0, microsecond=0)
+        else:
+            return dt.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    else:  # 15 minutes
+        if minutes < 8:
+            return dt.replace(minute=0, second=0, microsecond=0)
+        elif minutes < 23:
+            return dt.replace(minute=15, second=0, microsecond=0)
+        elif minutes < 38:
+            return dt.replace(minute=30, second=0, microsecond=0)
+        elif minutes < 53:
+            return dt.replace(minute=45, second=0, microsecond=0)
+        else:
+            return dt.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
 
 def suggest_alternative_dates(center, service, days_ahead=7):
     """Suggest dates with availability"""
