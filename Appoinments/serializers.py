@@ -24,7 +24,7 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = ['id', 'center', 'service', 'date', 'start_time', 'end_time', 
-                  'customer_name', 'status', 'center_id', 'service_id']
+                  'customer_name','customer_id', 'vehicle_name', 'status', 'center_id', 'service_id']
 
     def validate(self, data):  # data is passed as parameter here
         # Check availability
@@ -46,7 +46,7 @@ class BookingSerializer(serializers.ModelSerializer):
         overlapping = Booking.objects.filter(
             center=center,
             date=date,
-            status='booked'
+            status='pending'
         ).filter(
             models.Q(start_time__lt=end_time, end_time__gt=start_time) |
             models.Q(start_time__lt=start_time, end_time__gt=end_time)
@@ -62,7 +62,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
         # Check buffer with neighbors
         prev_bookings = Booking.objects.filter(
-            center=center, date=date, status='booked', end_time__lte=start_time
+            center=center, date=date, status='pending', end_time__lte=start_time
         ).order_by('-end_time')[:1]
         
         if prev_bookings:
@@ -72,7 +72,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Too close to previous booking.")
 
         next_bookings = Booking.objects.filter(
-            center=center, date=date, status='booked', start_time__gte=end_time
+            center=center, date=date, status='pending', start_time__gte=end_time
         ).order_by('start_time')[:1]
         
         if next_bookings:
@@ -82,3 +82,19 @@ class BookingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Too close to next booking.")
 
         return data
+    
+class BookingResponseSerializer:
+    def __init__(self, booking):
+        self.booking = booking
+    
+    def to_dict(self):
+        return {
+            "center": self.booking.center.name,
+            "service": self.booking.service.name,
+            "customer_name": self.booking.customer_name,
+            "date": str(self.booking.date),
+            "start_time": str(self.booking.start_time),
+            "end_time": str(self.booking.end_time),
+            "status": self.booking.status,
+        }
+

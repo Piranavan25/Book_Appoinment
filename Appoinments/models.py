@@ -27,7 +27,7 @@ class Service(models.Model):
 class Booking(models.Model):
     STATUS_CHOICES = [
         ('booked', 'Booked'),
-        ('cancelled', 'Cancelled'),
+        ('pending', 'Pending'),
     ]
     center = models.ForeignKey(Center, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
@@ -35,7 +35,9 @@ class Booking(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     customer_name = models.CharField(max_length=100)  # Simple; use User in production
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='booked')
+    customer_id = models.CharField(max_length=100, blank=True, null=True)  # Add customer_id field
+    vehicle_name = models.CharField(max_length=100, blank=True, null=True)  # Add vehicle_name field
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
